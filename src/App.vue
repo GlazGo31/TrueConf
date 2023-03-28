@@ -1,10 +1,10 @@
 <template>
   <div class="root">
     <div class="elevator-block"
-         :style="{'grid-template-columns': `repeat(${appData.elevators.length}, 1fr)`}"
+         :style="{'grid-template-columns': `repeat(${appData.countElevators.length}, 1fr)`}"
     >
       <v-elevator
-          v-for="(elevator) in appData.elevators"
+          v-for="(elevator) in appData.countElevators"
           :key="elevator"
           :currentStage="appData.selectedStages"
           :directionArrow="appData.beforeStage"
@@ -12,10 +12,10 @@
     </div>
 
     <div class="stage-block"
-         :style="{'grid-template-rows': `repeat(${appData.stages.length}, auto)`}"
+         :style="{'grid-template-rows': `repeat(${appData.countStages.length}, auto)`}"
     >
       <v-stage
-          v-for="stage in appData.stages"
+          v-for="stage in appData.countStages"
           :key="stage"
           :stage="stage"
           :current-stage="appData.selectedStages"
@@ -36,55 +36,56 @@ export default {
   data() {
     return {
       appData: {
-        elevators: [1], //количество лифтов
-        stages: [], // количество этажей
+        countElevators: [], //количество лифтов
+        countStages: [], // количество этажей
+        lineElevators: [], // очередь лифтов
         selectedStages: [],
         beforeStage: 1,
         elevatorIsReady: true,
-        animatedElevator: false,
+        animationElevator: false,
         nextStage: 0
       }
     }
   },
   methods: {
     clickButtonId(value) {
-
-      if (value !== this.appData.selectedStages[0] && !this.appData.selectedStages.includes(value)) {
-        if(value === this.appData.beforeStage) {
-          return
-        }
+      if (value !== this.appData.selectedStages[0] && value !== this.appData.beforeStage || this.appData.selectedStages.length > 0) {
         this.appData.selectedStages.push(value)
 
         localStorage.setItem('data', JSON.stringify(this.appData))
-        this.changeAppData('animatedElevator', true)
+        this.modificationAppData('animationElevator', true)
+          this.moveElevator()
 
-        this.moveElevator()
+
+
+      }
+      if(this.appData.nextStage !== 0 || this.appData.selectedStages.length === 0 || value === this.appData.beforeStage  ) {
+        return
       }
     },
 
     moveElevator(pageUpdate = false) {
-
-
       if (this.appData.selectedStages.length === 0) {
-        this.changeAppData('nextStage', 0)
+        this.modificationAppData('nextStage', 0)
       }
 
       if (this.appData.selectedStages.length > 0 && this.appData.elevatorIsReady) {
 
-        this.changeAppData('elevatorIsReady', false)
+        this.modificationAppData('elevatorIsReady', false)
 
-        this.changeAppData('nextStage', this.appData.selectedStages[0])
+        this.modificationAppData('nextStage', this.appData.selectedStages[0])
 
 
 
-        this.animationElevator(pageUpdate)
+        this.animatedElevator(pageUpdate)
       }
     },
-    animationElevator(pageUpdate) {
+    animatedElevator(pageUpdate) {
       gsap.to('.elevator-item', {
-        bottom: this.getDistanceElevator(),
-        duration: pageUpdate ? this.appData.nextStage - 1 : this.getSpeedElevator()
+        bottom: this.defaultDistanceElevator(),
+        duration: pageUpdate ? this.appData.nextStage - 1 : this.defaultSpeedElevator()
       }).then(() => {
+
         gsap.to('.elevator-item', {
           keyframes: [
             {opacity: 0},
@@ -93,17 +94,17 @@ export default {
           ease: 'sine.out'
         }).then(() => {
 
-          this.changeAppData('beforeStage', this.appData.selectedStages.shift())
-          this.changeAppData('elevatorIsReady', true)
+          this.modificationAppData('beforeStage', this.appData.selectedStages.shift())
+          this.modificationAppData('elevatorIsReady', true)
 
-          this.moveElevator()
+          this.moveElevator(false)
 
         })
 
       })
     },
-    getSpeedElevator() {
-      if (this.appData.animatedElevator) {
+    defaultSpeedElevator() {
+      if (this.appData.animationElevator) {
         if (this.appData.nextStage === this.appData.beforeStage) {
           return this.appData.beforeStage - 1
         }
@@ -111,11 +112,11 @@ export default {
             this.appData.beforeStage - this.appData.nextStage : this.appData.nextStage - this.appData.beforeStage
       }
     },
-    getDistanceElevator() {
+    defaultDistanceElevator() {
       return this.appData.nextStage > 1 ? (this.appData.nextStage - 1) * 140 : 0
     },
 
-    changeAppData(property, value) {
+    modificationAppData(property, value) {
       this.appData[property] = value
       localStorage.setItem('data', JSON.stringify(this.appData))
     },
@@ -126,22 +127,37 @@ export default {
       if (localStorageData) {
         this.appData = {...JSON.parse(localStorageData)}
       } else {
-        localStorage.setItem("data", JSON.stringify(this.appData))
-      }
-    },
-    initialStages(countStages) {
-      const stagesLocal = []
 
-      for (let i = 1; i <= countStages; i++) {
-        stagesLocal.push(i)
+        localStorage.setItem("data", JSON.stringify(this.appData))
+        }
+
+    },
+    initializationStages(count) {
+      const primaryStages = []
+
+      for (let i = 1; i <= count; i++) {
+        primaryStages.push(i)
       }
-      this.appData.stages = stagesLocal.reverse()
+      this.appData.countStages = primaryStages.reverse()
+      localStorage.setItem("data", JSON.stringify(this.appData))
+    },
+
+    initializationElevators(count) {
+      const primaryElevators = []
+
+      for (let i = 1; i <= count; i++) {
+        primaryElevators.push({id: i, visitedFloor: null})
+      }
+      this.appData.countElevators = [...primaryElevators]
+      console.log(this.appData.countElevators)
       localStorage.setItem("data", JSON.stringify(this.appData))
     },
   },
   created() {
     this.updateLocalStorage()
-    this.initialStages(6) //масштабируем количество этажей
+    this.initializationStages(6) //масштабируем количество этажей
+    this.initializationElevators(3) // масшатабируем количество лифтов
+
   },
   mounted() {
     this.appData.elevatorIsReady = true
